@@ -4,11 +4,22 @@
   "type": "module",
   "scripts": {
     "test": "tsx --test src/domain/**/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test:persistence": "prisma migrate deploy && tsx --test src/infrastructure/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "prisma": "7.10.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "^18.0.5",
+    "pg": "^8.23.1"
   }
 }
