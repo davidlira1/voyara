@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "test": "tsx --test src/domain/**/*.test.ts",
-    "test:persistence": "prisma migrate deploy && tsx --test src/infrastructure/**/*.test.ts",
+    "test:persistence": "prisma migrate deploy && tsx --test --test-concurrency=1 src/infrastructure/persistence/prisma/*.test.ts src/infrastructure/seed/*.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx src/infrastructure/seed/seed.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
