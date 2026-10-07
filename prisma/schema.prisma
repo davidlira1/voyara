@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum VehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+
+  @@map("vehicle_status")
+}
+
+enum FlightStatus {
+  SCHEDULED
+  BOARDING
+  DEPARTED
+  IN_FLIGHT
+  RETURNING
+  ARRIVED
+  DELAYED
+  CANCELLED
+
+  @@map("flight_status")
+}
+
+enum ReservationStatus {
+  HELD
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@map("reservation_status")
+}
+
+model Voyage {
+  id                  String @id @db.Uuid
+  code                String @unique
+  name                String
+  description         String
+  durationMinutes     Int    @map("duration_minutes")
+  baseFareAmountMinor BigInt @map("base_fare_amount_minor") @db.BigInt
+  baseFareCurrency    String @map("base_fare_currency") @db.Char(3)
+
+  flights Flight[]
+
+  @@map("voyages")
+}
+
+model TravelClass {
+  id                          String @id @db.Uuid
+  code                        String @unique
+  name                        String
+  fareMultiplierNumerator     Int    @map("fare_multiplier_numerator")
+  fareMultiplierDenominator   Int    @map("fare_multiplier_denominator")
+
+  familyCapacities VehicleFamilyTravelClass[]
+  accommodations   FlightAccommodation[]
+  reservations     Reservation[]
+
+  @@map("travel_classes")
+}
+
+model VehicleFamily {
+  id   String @id @db.Uuid
+  code String @unique
+  name String
+
+  vehicles      Vehicle[]
+  travelClasses VehicleFamilyTravelClass[]
+
+  @@map("vehicle_families")
+}
+
+model VehicleFamilyTravelClass {
+  id              String @id @db.Uuid
+  vehicleFamilyId String @map("vehicle_family_id") @db.Uuid
+  travelClassId   String @map("travel_class_id") @db.Uuid
+  capacity        Int
+
+  vehicleFamily VehicleFamily @relation(fields: [vehicleFamilyId], references: [id], onDelete: Cascade)
+  travelClass   TravelClass   @relation(fields: [travelClassId], references: [id], onDelete: Restrict)
+
+  @@unique([vehicleFamilyId, travelClassId])
+  @@index([travelClassId])
+  @@map("vehicle_family_travel_classes")
+}
+
+model Vehicle {
+  id              String        @id @db.Uuid
+  code            String        @unique
+  name            String
+  vehicleFamilyId String        @map("vehicle_family_id") @db.Uuid
+  status          VehicleStatus
+
+  vehicleFamily VehicleFamily @relation(fields: [vehicleFamilyId], references: [id], onDelete: Restrict)
+  flights       Flight[]
+
+  @@index([vehicleFamilyId])
+  @@map("vehicles")
+}
+
+model Flight {
+  id           String       @id @db.Uuid
+  flightNumber String       @unique @map("flight_number")
+  voyageId     String       @map("voyage_id") @db.Uuid
+  vehicleId    String       @map("vehicle_id") @db.Uuid
+  departureAt  DateTime     @map("departure_at") @db.Timestamptz(3)
+  returnAt     DateTime     @map("return_at") @db.Timestamptz(3)
+  status       FlightStatus
+
+  voyage         Voyage                @relation(fields: [voyageId], references: [id], onDelete: Restrict)
+  vehicle        Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  accommodations FlightAccommodation[]
+  reservations   Reservation[]
+
+  @@index([voyageId])
+  @@index([vehicleId])
+  @@map("flights")
+}
+
+model FlightAccommodation {
+  id            String @id @db.Uuid
+  flightId      String @map("flight_id") @db.Uuid
+  travelClassId String @map("travel_class_id") @db.Uuid
+  code          String
+
+  flight      Flight                 @relation(fields: [flightId], references: [id], onDelete: Cascade)
+  travelClass TravelClass            @relation(fields: [travelClassId], references: [id], onDelete: Restrict)
+  passengers  ReservationPassenger[]
+
+  @@unique([flightId, code])
+  @@unique([id, flightId, travelClassId])
+  @@index([travelClassId])
+  @@map("flight_accommodations")
+}
+
+model Customer {
+  id        String   @id @db.Uuid
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  email     String
+  phone     String
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
+
+  reservations Reservation[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Passenger {
+  id        String   @id @db.Uuid
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
+
+  reservations ReservationPassenger[]
+
+  @@map("passengers")
+}
+
+model Reservation {
+  id                    String            @id @db.Uuid
+  confirmationCode      String            @unique @map("confirmation_code")
+  customerId            String            @map("customer_id") @db.Uuid
+  flightId              String            @map("flight_id") @db.Uuid
+  travelClassId         String            @map("travel_class_id") @db.Uuid
+  status                ReservationStatus
+  totalPriceAmountMinor BigInt            @map("total_price_amount_minor") @db.BigInt
+  totalPriceCurrency    String            @map("total_price_currency") @db.Char(3)
+  createdAt             DateTime          @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime          @map("updated_at") @db.Timestamptz(3)
+
+  customer    Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  flight      Flight                 @relation(fields: [flightId], references: [id], onDelete: Restrict)
+  travelClass TravelClass            @relation(fields: [travelClassId], references: [id], onDelete: Restrict)
+  passengers  ReservationPassenger[]
+
+  @@unique([id, flightId, travelClassId])
+  @@index([customerId])
+  @@index([flightId])
+  @@index([travelClassId])
+  @@map("reservations")
+}
+
+model ReservationPassenger {
+  id                    String @id @db.Uuid
+  reservationId         String @map("reservation_id") @db.Uuid
+  passengerId           String @map("passenger_id") @db.Uuid
+  flightAccommodationId String @map("flight_accommodation_id") @db.Uuid
+  flightId              String @map("flight_id") @db.Uuid
+  travelClassId         String @map("travel_class_id") @db.Uuid
+  fareAmountMinor       BigInt @map("fare_amount_minor") @db.BigInt
+  fareCurrency          String @map("fare_currency") @db.Char(3)
+
+  reservation   Reservation         @relation(fields: [reservationId, flightId, travelClassId], references: [id, flightId, travelClassId], onDelete: Cascade)
+  passenger     Passenger           @relation(fields: [passengerId], references: [id], onDelete: Restrict)
+  accommodation FlightAccommodation @relation(fields: [flightAccommodationId, flightId, travelClassId], references: [id, flightId, travelClassId], onDelete: Restrict)
+
+  @@unique([reservationId, passengerId])
+  @@index([passengerId])
+  @@index([flightAccommodationId])
+  @@map("reservation_passengers")
+}
