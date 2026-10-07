@@ -2,7 +2,7 @@
 
 Voyara stores its domain in PostgreSQL. Prisma is the infrastructure adapter that talks to that database. Domain objects and repository contracts do not import Prisma, PostgreSQL, or SQL.
 
-`PRODUCT.md` remains the product source of truth. This milestone does not seed the voyage catalog.
+`PRODUCT.md` remains the product source of truth. The development demo universe is loaded with `npm run db:seed`, described in [seed.md](seed.md).
 
 ## Why these tools
 
@@ -171,7 +171,7 @@ Migration SQL
 PostgreSQL
 ```
 
-`npm run test:persistence` runs `prisma migrate deploy` before the tests. Local development can use `npm run db:migrate`.
+`npm run test:persistence` runs `prisma migrate deploy` before the tests. Local development can use `npm run db:migrate`. `npm run db:seed` rebuilds the demo universe without changing migration history.
 
 ## Local database
 
@@ -196,6 +196,7 @@ Then:
 ```text
 npm run db:generate
 npm run db:migrate
+npm run db:seed
 npm test
 npm run typecheck
 npm run test:persistence
@@ -205,7 +206,7 @@ npm run test:persistence
 
 ## Deferred rules
 
-An accommodation may be held by only one reservation whose status is not `CANCELLED`. `HELD`, `CONFIRMED`, and `COMPLETED` occupy it. A unique constraint on `flight_accommodation_id` would erase that history, so it is not present. A partial index cannot see `reservations.status` on another table. Booking concurrency will enforce this in a transaction, with a later database backstop such as triggers on both tables or a current-claim row.
+An accommodation may be held by only one reservation whose status is not `CANCELLED`. `HELD` and `CONFIRMED` are active claims. `COMPLETED` still occupies the accommodation after the trip. `CANCELLED` releases it and may remain as a historical assignment, including on an accommodation that a later active reservation uses. A unique constraint on `flight_accommodation_id` would erase that history, so it is not present. A partial index cannot see `reservations.status` on another table. The demo seed guarantees one active claim per accommodation. PostgreSQL does not enforce that yet. Booking concurrency will add the backstop later, such as triggers on both tables or a current-claim row.
 
 A vehicle cannot operate overlapping flights. Cancelled flights must not block the vehicle. The later backstop is a PostgreSQL `EXCLUDE` constraint on `tstzrange(departure_at, return_at)` per vehicle where status is not `CANCELLED`, using `btree_gist`. Prisma cannot migrate exclusion constraints. Booking logic should reject the overlap, and the exclusion constraint should stop a race. Neither is installed now.
 
