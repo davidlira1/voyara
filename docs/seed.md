@@ -1,6 +1,6 @@
 # Voyara demo seed
 
-`npm run db:seed` rebuilds the canonical development database.
+`npm run db:seed` rebuilds the canonical development database. PostgreSQL must already be running (`npm run db:up` or `npm run db:setup`).
 
 It is development and demo behavior, not a production data-management tool. Each run:
 

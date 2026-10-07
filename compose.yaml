@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: voyara-postgres
+    environment:
+      POSTGRES_USER: voyara
+      POSTGRES_PASSWORD: voyara
+      POSTGRES_DB: voyara_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - voyara_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voyara -d voyara_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  voyara_postgres_data:

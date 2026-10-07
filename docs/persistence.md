@@ -175,34 +175,37 @@ PostgreSQL
 
 ## Local database
 
-Persistence tests truncate the database named by `DATABASE_URL`. Point that URL at a disposable database.
+PostgreSQL 17 runs in Docker. Copy `.env.example` to `.env`:
 
 ```text
-docker run --name voyara-postgres \
-  -e POSTGRES_USER=voyara \
-  -e POSTGRES_PASSWORD=voyara \
-  -e POSTGRES_DB=voyara_test \
-  -p 5432:5432 -d postgres:17
+DATABASE_URL=postgresql://voyara:voyara@localhost:5432/voyara_db
 ```
 
-Copy `.env.example` to `.env`:
+The database is disposable local development state. These commands manage it:
 
 ```text
-DATABASE_URL=postgresql://voyara:voyara@localhost:5432/voyara_test
+npm run db:setup   # start DB + migrate + seed
+npm run db:up      # start existing DB
+npm run db:down    # stop DB, preserve data
+npm run db:seed    # wipe/rebuild Voyara data
+npm run db:reset   # migrate if needed, then reseed
 ```
 
-Then:
+`db:setup` starts the container, waits until PostgreSQL is healthy, applies committed migrations, and seeds the demo universe. `db:up` and `db:down` do not reseed. `db:down` does not delete the Docker volume, so the next `db:up` keeps the existing data. `db:seed` truncates Voyara application tables and rebuilds the canonical universe. It leaves the schema and migration history in place.
+
+Open a SQL prompt without installing `psql` on the host:
 
 ```text
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm test
-npm run typecheck
-npm run test:persistence
+docker exec -it voyara-postgres psql -U voyara -d voyara_db
 ```
 
-`npm test` runs the domain unit tests and does not need PostgreSQL.
+The prompt is `voyara_db=#`. This lists the seeded voyages:
+
+```sql
+SELECT code, name FROM voyages ORDER BY code;
+```
+
+Persistence tests truncate the database named by `DATABASE_URL`. `npm test` runs the domain unit tests and does not need PostgreSQL. `npm run db:migrate` is for authoring a new migration. `db:setup` and `db:reset` apply migrations that are already committed.
 
 ## Deferred rules
 

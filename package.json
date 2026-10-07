@@ -3,11 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx --test src/domain/**/*.test.ts",
+    "test": "tsx --test src/domain/**/*.test.ts src/application/**/*.test.ts",
     "test:persistence": "prisma migrate deploy && tsx --test --test-concurrency=1 src/infrastructure/persistence/prisma/*.test.ts src/infrastructure/seed/*.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:setup": "bash scripts/db-setup.sh",
+    "db:reset": "prisma migrate deploy && npm run db:seed",
     "db:seed": "tsx src/infrastructure/seed/seed.ts"
   },
   "devDependencies": {
