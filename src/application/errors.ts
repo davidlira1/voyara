@@ -50,3 +50,21 @@ export class InsufficientAvailabilityError extends ApplicationError {
     );
   }
 }
+
+export class InvalidReservationError extends ApplicationError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class ReservationNotFoundError extends ApplicationError {
+  constructor(confirmationCode: string) {
+    super(`Reservation ${confirmationCode} was not found.`);
+  }
+}
+
+export class CancellationNotAllowedError extends ApplicationError {
+  constructor(confirmationCode: string) {
+    super(`Reservation ${confirmationCode} cannot be cancelled.`);
+  }
+}
