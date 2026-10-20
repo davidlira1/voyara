@@ -314,6 +314,20 @@ describe("HTTP server", () => {
         absent: "SECRET",
       },
       {
+        path: "/api/flights?departureFrom=2026-02-31T00:00:00.000Z",
+        status: 400,
+        code: "INVALID_SEARCH_CRITERIA",
+        message: "Search criteria are invalid.",
+        absent: "2026-03",
+      },
+      {
+        path: "/api/flights?departureFrom=2026-11-05T00:00:00.000%2B99:00",
+        status: 400,
+        code: "INVALID_SEARCH_CRITERIA",
+        message: "Search criteria are invalid.",
+        absent: "+99:00",
+      },
+      {
         path: "/api/flights?passengerCount=0",
         status: 400,
         code: "INVALID_SEARCH_CRITERIA",

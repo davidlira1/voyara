@@ -158,7 +158,7 @@ Boundary tests listen on an ephemeral port and do not need PostgreSQL:
 npm test
 ```
 
-The destructive HTTP flow creates and migrates a separate `voyara_test` database, then seeds only that database. It does not reseed `voyara_db`. The flow takes a PostgreSQL advisory lock and the test runner uses `--test-concurrency=1`, so two HTTP integration runs do not rebuild `voyara_test` at the same time. Do not point this command at another database.
+The destructive HTTP flow creates and migrates a separate `voyara_test` database, then seeds only that database. It does not reseed `voyara_db`. `npm run test:http` holds one PostgreSQL advisory lock on a maintenance connection for database creation, migration, and seeding, and the test file runs with `--test-concurrency=1`. A second run waits until that lock is released. Do not point this command at another database.
 
 ```text
 npm run test:http

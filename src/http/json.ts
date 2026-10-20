@@ -375,17 +375,115 @@ function serializeMoney(money: Money): {
 }
 
 function parseInstant(value: string): Date {
-  if (!isoInstant.test(value)) {
+  const match = isoInstant.exec(value);
+  const year = numberGroup(match, 1);
+  const month = numberGroup(match, 2);
+  const day = numberGroup(match, 3);
+  const hour = numberGroup(match, 4);
+  const minute = numberGroup(match, 5);
+  const second = numberGroup(match, 6);
+  const zone = match?.[8];
+
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    hour === undefined ||
+    minute === undefined ||
+    second === undefined ||
+    zone === undefined ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
     throw clientError("INVALID_SEARCH_CRITERIA");
   }
 
-  const instant = new Date(value);
+  const milliseconds = readMilliseconds(match?.[7]);
+  const offsetMinutes = zone === "Z" ? 0 : readOffsetMinutes(zone);
+  const wallClock = Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    second,
+    milliseconds,
+  );
+  const probe = new Date(wallClock);
 
-  if (Number.isNaN(instant.getTime())) {
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day ||
+    probe.getUTCHours() !== hour ||
+    probe.getUTCMinutes() !== minute ||
+    probe.getUTCSeconds() !== second ||
+    probe.getUTCMilliseconds() !== milliseconds
+  ) {
     throw clientError("INVALID_SEARCH_CRITERIA");
   }
 
-  return instant;
+  return new Date(wallClock - offsetMinutes * 60_000);
+}
+
+function numberGroup(match: RegExpExecArray | null, index: number): number | undefined {
+  const text = match?.[index];
+
+  if (text === undefined) {
+    return undefined;
+  }
+
+  return Number(text);
+}
+
+function readOffsetMinutes(zone: string): number {
+  const sign = zone.startsWith("+") ? 1 : -1;
+  const offsetHour = Number(zone.slice(1, 3));
+  const offsetMinute = Number(zone.slice(4, 6));
+
+  if (
+    !Number.isInteger(offsetHour) ||
+    !Number.isInteger(offsetMinute) ||
+    offsetHour > 23 ||
+    offsetMinute > 59
+  ) {
+    throw clientError("INVALID_SEARCH_CRITERIA");
+  }
+
+  return sign * (offsetHour * 60 + offsetMinute);
+}
+
+function readMilliseconds(fraction: string | undefined): number {
+  if (fraction === undefined) {
+    return 0;
+  }
+
+  return Number(fraction.slice(1).padEnd(3, "0"));
+}
+
+function daysInMonth(year: number, month: number): number {
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const lengths = [
+    31,
+    leap ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
+  return lengths[month - 1] ?? 0;
 }
 
 function parseCanonicalInteger(value: string): number {

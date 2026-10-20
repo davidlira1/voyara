@@ -3,7 +3,6 @@ import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import { after, before, describe, it } from "node:test";
 import type { Clock } from "../../application/clock.js";
-import { Client } from "pg";
 import { seedDatabase } from "../../infrastructure/seed/seed-database.js";
 import {
   createPrismaClient,
@@ -26,15 +25,11 @@ describe("HTTP reservation flow", { timeout: 120_000 }, () => {
     },
   };
   let prisma: PrismaClient | undefined;
-  let lockClient: Client | undefined;
   let server: Server | undefined;
   let baseUrl: URL;
 
   before(async () => {
     assertIsolatedTestDatabase();
-    lockClient = new Client({ connectionString: process.env.DATABASE_URL });
-    await lockClient.connect();
-    await lockClient.query("SELECT pg_advisory_lock(44, 44044)");
     prisma = createPrismaClient();
     await seedDatabase({ anchor, prisma });
     server = composeHttpServer({
@@ -49,11 +44,6 @@ describe("HTTP reservation flow", { timeout: 120_000 }, () => {
   after(async () => {
     if (server !== undefined) {
       await closeServer(server);
-    }
-
-    if (lockClient !== undefined) {
-      await lockClient.query("SELECT pg_advisory_unlock(44, 44044)");
-      await lockClient.end();
     }
 
     if (prisma !== undefined) {
