@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Clock } from "../application/clock.js";
+import { chatWithNova } from "../application/nova/chat-with-nova.js";
+import type { LanguageModel } from "../application/ports/language-model.js";
 import { getFlight, getFlightAvailability, searchFlights } from "../application/flights/flight-queries.js";
 import type { FlightQueryRepository } from "../application/ports/flight-query-repository.js";
 import type { IdGenerator } from "../application/ports/id-generator.js";
@@ -20,6 +22,7 @@ import {
   parseCancelBody,
   parseFlightSearchQuery,
   parseJsonBody,
+  parseNovaMessage,
   readRequestBody,
   serializeAvailability,
   serializeConfirmation,
@@ -47,6 +50,7 @@ export type HttpDependencies = {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly devAccessToken: string;
+  readonly languageModel: LanguageModel;
   readonly maxBodyBytes?: number;
   readonly log?: HttpLog;
 };
@@ -76,6 +80,10 @@ const routes: readonly HttpRoute[] = [
     sensitive: true,
   }),
   compileRoute("POST", "/api/reservations/:confirmationCode/cancel", {
+    authenticate: true,
+    sensitive: true,
+  }),
+  compileRoute("POST", "/api/nova/chat", {
     authenticate: true,
     sensitive: true,
   }),
@@ -201,7 +209,7 @@ async function dispatch(
     const client = toClientError(error);
     status = client.status;
 
-    if (client.status === 500) {
+    if (client.status >= 500) {
       log.failure({
         route,
         errorName: error instanceof Error ? error.name : "Error",
@@ -288,6 +296,11 @@ async function handle(
           cancellations: dependencies.cancellations,
           clock: dependencies.clock,
         }),
+      );
+    case "/api/nova/chat":
+      return chatWithNova(
+        parseNovaMessage(await readJson(request, maxBodyBytes, { required: true })),
+        { model: dependencies.languageModel },
       );
     default:
       throw clientError("ROUTE_NOT_FOUND");

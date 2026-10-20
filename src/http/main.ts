@@ -1,4 +1,6 @@
 import type { Server } from "node:http";
+import { createGeminiLanguageModel } from "../infrastructure/gemini/gemini-language-model.js";
+import { loadNovaConfig } from "../infrastructure/gemini/nova-config.js";
 import { createPrismaClient } from "../infrastructure/persistence/prisma/client.js";
 import type { PrismaClient } from "../infrastructure/persistence/prisma/client.js";
 import { loadHttpConfig } from "./config.js";
@@ -17,10 +19,12 @@ start().catch((error: unknown) => {
 
 async function start(): Promise<void> {
   const config = loadHttpConfig();
+  const novaConfig = loadNovaConfig();
   const prisma = createPrismaClient();
   const server = composeHttpServer({
     prisma,
     devAccessToken: config.devAccessToken,
+    languageModel: createGeminiLanguageModel(novaConfig),
   });
   let shuttingDown = false;
 

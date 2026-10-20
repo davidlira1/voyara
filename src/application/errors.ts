@@ -68,3 +68,21 @@ export class CancellationNotAllowedError extends ApplicationError {
     super(`Reservation ${confirmationCode} cannot be cancelled.`);
   }
 }
+
+export class InvalidNovaMessageError extends ApplicationError {
+  constructor() {
+    super("Message is invalid.");
+  }
+}
+
+export class NovaUnavailableError extends ApplicationError {
+  constructor() {
+    super("Nova is unavailable.");
+  }
+}
+
+export class NovaTimeoutError extends ApplicationError {
+  constructor() {
+    super("Nova took too long to respond.");
+  }
+}
