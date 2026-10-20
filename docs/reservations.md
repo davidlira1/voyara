@@ -1,6 +1,6 @@
 # Reservation retrieval and cancellation
 
-`getReservation` and `cancelReservation` are application operations. A future HTTP API, operations dashboard, or Nova calls them. They do not query Prisma themselves, and a confirmation code is not an authorization check. That check belongs at the future interface boundary.
+`getReservation` and `cancelReservation` are application operations. The HTTP API calls them after checking a development access token. They do not query Prisma themselves. A confirmation code is not an authorization check.
 
 ## Retrieval
 

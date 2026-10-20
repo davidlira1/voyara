@@ -11,3 +11,9 @@ Open SQL without installing `psql` on the host:
 ```text
 docker exec -it voyara-postgres psql -U voyara -d voyara_db
 ```
+
+Start the local HTTP API after the database is seeded. Set `VOYARA_DEV_ACCESS_TOKEN` in `.env` first. That token is only for local development, server-side tools, and automated tests. See [docs/http.md](docs/http.md).
+
+```text
+npm start
+```
