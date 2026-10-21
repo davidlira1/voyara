@@ -44,3 +44,11 @@ The request accepts only `message`. A message must be a non-blank string of at m
 Missing or wrong development tokens return `401` and do not call the model. An invalid message returns `400`. If Gemini fails or returns nothing usable, the response is `502` with `Nova is unavailable.` If the call exceeds the timeout, the response is `504` with `Nova took too long to respond.` Those bodies do not include the API key, the user message, or the provider payload.
 
 Logs record the method, the route template, the status, and, for a server-side failure, the error name. They do not record the message, the reply, or the API key.
+
+## Gemini client
+
+Nova calls Gemini's `generateContent` REST method with Node's `fetch`. The official Google Gen AI SDK is not a dependency. This call is one JSON body: the fixed system instruction and a single user message. Keeping it as REST leaves the provider behind the `LanguageModel` port, makes the timeout and error mapping explicit, and avoids an SDK for a request that does not use tools.
+
+A timeout while connecting, waiting for headers, or reading the response body becomes `504`. Any other Gemini failure, including a non-OK status or an unusable payload, becomes `502`. Neither error includes the API key or the provider body.
+
+Tool calling in M5.2 should adopt the official SDK behind the same port. Function declarations and tool results are easy to get wrong in hand-written JSON, and the SDK is the maintained client for that protocol. There is no reason to replace this single-turn REST call before those tools exist.

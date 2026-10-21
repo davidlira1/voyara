@@ -12,10 +12,9 @@ export function createGeminiLanguageModel(config: NovaConfig): LanguageModel {
     async generate(input) {
       const timeoutSignal = AbortSignal.timeout(config.timeoutMs);
       const signal = AbortSignal.any([input.signal, timeoutSignal]);
-      let response: Response;
 
       try {
-        response = await fetch(endpoint, {
+        const response = await fetch(endpoint, {
           method: "POST",
           redirect: "error",
           headers: {
@@ -38,30 +37,36 @@ export function createGeminiLanguageModel(config: NovaConfig): LanguageModel {
           }),
           signal,
         });
-      } catch {
-        if (timeoutSignal.aborted) {
+
+        if (!response.ok) {
+          await response.text();
+          throw new NovaUnavailableError();
+        }
+
+        return readGeminiText(await response.json());
+      } catch (error) {
+        if (
+          error instanceof NovaTimeoutError ||
+          error instanceof NovaUnavailableError
+        ) {
+          throw error;
+        }
+
+        if (timedOut(timeoutSignal, error)) {
           throw new NovaTimeoutError();
         }
 
         throw new NovaUnavailableError();
       }
-
-      if (!response.ok) {
-        await response.text().catch(() => undefined);
-        throw new NovaUnavailableError();
-      }
-
-      let payload: unknown;
-
-      try {
-        payload = await response.json();
-      } catch {
-        throw new NovaUnavailableError();
-      }
-
-      return readGeminiText(payload);
     },
   };
+}
+
+function timedOut(timeoutSignal: AbortSignal, error: unknown): boolean {
+  return (
+    timeoutSignal.aborted ||
+    (error instanceof Error && error.name === "TimeoutError")
+  );
 }
 
 function readGeminiText(payload: unknown): string {
