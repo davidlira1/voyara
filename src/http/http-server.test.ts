@@ -76,6 +76,36 @@ describe("HTTP server", () => {
     logs.length = 0;
   });
 
+  it("keeps Express defaults from changing the public contract", async () => {
+    const head = await send(baseUrl, "/api/voyages", { method: "HEAD" });
+    assert.equal(head.status, 405);
+    assert.equal(head.headers.get("allow"), "GET");
+    assert.equal(head.headers.get("x-powered-by"), null);
+    assert.equal(head.headers.get("etag"), null);
+
+    const voyages = await send(baseUrl, "/api/voyages");
+    assert.equal(voyages.status, 200);
+    assert.equal(voyages.headers.get("x-powered-by"), null);
+    assert.equal(voyages.headers.get("etag"), null);
+
+    const wrongCase = await send(baseUrl, "/API/voyages");
+    assert.equal(wrongCase.status, 404);
+    assert.equal(wrongCase.body.error.code, "ROUTE_NOT_FOUND");
+
+    const trailingSlash = await send(baseUrl, "/api/voyages/");
+    assert.equal(trailingSlash.status, 200);
+
+    const unauthenticated = await send(baseUrl, "/api/nova/chat", {
+      method: "POST",
+      body: '{"message":"secret-mars-prompt"',
+    });
+    assert.equal(unauthenticated.status, 401);
+    assert.equal(unauthenticated.text.includes("secret-mars-prompt"), false);
+    assert.deepEqual(unauthenticated.body, {
+      error: { code: "UNAUTHORIZED", message: "Access denied." },
+    });
+  });
+
   it("reads voyages, flights, and availability", async () => {
     const health = await send(baseUrl, "/health");
     assert.equal(health.status, 200);

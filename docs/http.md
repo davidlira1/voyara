@@ -1,12 +1,12 @@
 # Voyara HTTP API
 
-The HTTP server is an inbound adapter. It validates requests, checks the development access token, and calls the existing application operations. Domain and application code do not see HTTP requests, status codes, or JSON.
+The HTTP server is an Express application. It validates requests, checks the development access token, and calls the existing application operations. Domain and application code do not see HTTP requests, status codes, or JSON.
 
 ```text
 HTTP client
     |
     v
-node:http server
+Express app
     |
     v
 validation, development access check, and error mapping
@@ -23,6 +23,13 @@ Prisma adapters
     v
 PostgreSQL
 ```
+
+A request goes through four places:
+
+- [src/http/main.ts](../src/http/main.ts) loads configuration, creates one Prisma client and the Gemini adapter, and listens. Shutdown closes the listener and disconnects Prisma.
+- [src/http/compose.ts](../src/http/compose.ts) wires those dependencies. [src/http/app.ts](../src/http/app.ts) builds the Express app: security headers, the request log, the feature routers, the 404 handler, and the error handler.
+- [src/http/routes](../src/http/routes) registers each path and method. The handlers read parameters, call an application service, and serialize the result.
+- [src/http/error-handler.ts](../src/http/error-handler.ts) turns application and transport failures into the public error JSON.
 
 One Prisma client is created when the process starts and is shared by every request. `SIGINT` and `SIGTERM` stop the listener and then disconnect Prisma. Press `Ctrl-C` in the terminal that is running the server.
 

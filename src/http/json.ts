@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http";
 import type { FlightSearchCriteria } from "../application/flights/flight-search-criteria.js";
 import type {
   FlightAvailability,
@@ -325,45 +324,6 @@ export function parseCancelBody(value: unknown): void {
 
   if (Object.keys(value).length !== 0) {
     throw clientError("INVALID_BODY");
-  }
-}
-
-export async function readRequestBody(
-  request: IncomingMessage,
-  maxBytes: number,
-): Promise<Buffer> {
-  const declared = request.headers["content-length"];
-
-  if (typeof declared === "string" && /^[0-9]+$/.test(declared)) {
-    const length = Number(declared);
-
-    if (Number.isSafeInteger(length) && length > maxBytes) {
-      throw clientError("PAYLOAD_TOO_LARGE");
-    }
-  }
-
-  const chunks: Buffer[] = [];
-  let received = 0;
-
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    received += buffer.length;
-
-    if (received > maxBytes) {
-      throw clientError("PAYLOAD_TOO_LARGE");
-    }
-
-    chunks.push(buffer);
-  }
-
-  return Buffer.concat(chunks);
-}
-
-export function parseJsonBody(bytes: Buffer): unknown {
-  try {
-    return JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw clientError("INVALID_JSON");
   }
 }
 

@@ -80,6 +80,15 @@ export function clientError(code: ClientErrorCode): HttpError {
   return new HttpError(code);
 }
 
+export class MethodNotAllowedError extends HttpError {
+  readonly allow: string;
+
+  constructor(allow: readonly string[]) {
+    super("METHOD_NOT_ALLOWED");
+    this.allow = [...allow].sort().join(", ");
+  }
+}
+
 export function clientErrorBody(error: HttpError): {
   error: { code: ClientErrorCode; message: string };
 } {
