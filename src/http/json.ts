@@ -265,6 +265,25 @@ export function parseFlightSearchQuery(
   return criteria;
 }
 
+export function parseNovaMessage(value: unknown): string {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw clientError("INVALID_NOVA_MESSAGE");
+  }
+
+  const body = value as Record<string, unknown>;
+  const keys = Object.keys(body);
+
+  if (
+    keys.length !== 1 ||
+    !Object.hasOwn(body, "message") ||
+    typeof body.message !== "string"
+  ) {
+    throw clientError("INVALID_NOVA_MESSAGE");
+  }
+
+  return body.message;
+}
+
 export function parseBookingBody(value: unknown): BookingRequest {
   const body = plainObject(value);
   requireExactKeys(body, [

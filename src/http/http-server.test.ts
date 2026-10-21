@@ -3,6 +3,10 @@ import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { Clock } from "../application/clock.js";
+import { MAX_NOVA_MESSAGE_LENGTH } from "../application/nova/chat-with-nova.js";
+import { NovaUnavailableError } from "../application/errors.js";
+import { NovaTimeoutError } from "../application/errors.js";
+import type { LanguageModel } from "../application/ports/language-model.js";
 import type { FlightSearchQuery } from "../application/flights/flight-search-criteria.js";
 import type {
   FlightAvailabilityFacts,
@@ -55,6 +59,7 @@ describe("HTTP server", () => {
       ids,
       clock,
       devAccessToken,
+      languageModel: idleLanguageModel,
       log: recordingLog(logs),
     });
     baseUrl = await listen(server);
@@ -521,6 +526,7 @@ describe("HTTP server", () => {
       ids,
       clock,
       devAccessToken,
+      languageModel: idleLanguageModel,
       voyages: {
         async list() {
           throw leaking;
@@ -584,6 +590,186 @@ describe("HTTP configuration", () => {
     );
   });
 });
+
+describe("Nova chat", () => {
+  const devAccessToken = randomBytes(24).toString("hex");
+  const userMessage = "I want to see Mars.";
+  const fakeKey = "gemini-test-key-should-not-leak";
+
+  it("requires the development token and returns the fake reply", async () => {
+    let calls = 0;
+    const logs: LogEntry[] = [];
+    const server = createHttpServer({
+      ...createCatalog().ports(),
+      ids: createSequentialIds(),
+      clock: { now: () => new Date("2026-10-07T00:00:00.000Z") },
+      devAccessToken,
+      log: recordingLog(logs),
+      languageModel: {
+        async generate(input) {
+          calls += 1;
+          assert.equal(input.userMessage, userMessage);
+          assert.equal(input.systemInstruction.includes(userMessage), false);
+          assert.match(input.systemInstruction, /flight concierge/);
+          return "Where would you like to go?";
+        },
+      },
+    });
+    const baseUrl = await listen(server);
+
+    try {
+      const denied = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: userMessage, token: fakeKey }),
+      });
+      assert.equal(denied.status, 401);
+      assert.equal(calls, 0);
+      assert.equal(denied.text.includes(userMessage), false);
+      assert.equal(denied.text.includes(fakeKey), false);
+
+      const accepted = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: `  ${userMessage}  ` }),
+      });
+      assert.equal(accepted.status, 200);
+      assert.equal(accepted.headers.get("cache-control"), "no-store");
+      assert.deepEqual(accepted.body, {
+        reply: "Where would you like to go?",
+      });
+      assert.equal(calls, 1);
+      assert.equal(JSON.stringify(logs).includes(userMessage), false);
+      assert.equal(JSON.stringify(logs).includes(fakeKey), false);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("rejects an invalid message and hides upstream failures", async () => {
+    const logs: LogEntry[] = [];
+    const server = createHttpServer({
+      ...createCatalog().ports(),
+      ids: createSequentialIds(),
+      clock: { now: () => new Date("2026-10-07T00:00:00.000Z") },
+      devAccessToken,
+      log: recordingLog(logs),
+      languageModel: {
+        async generate() {
+          const error = new NovaUnavailableError();
+          error.message = `upstream ${fakeKey} ${userMessage}`;
+          throw error;
+        },
+      },
+    });
+    const baseUrl = await listen(server);
+
+    try {
+      const malformed = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: `{"message":"${userMessage}"`,
+      });
+      assert.equal(malformed.status, 400);
+      assert.equal(malformed.body.error.code, "INVALID_JSON");
+      assert.equal(malformed.text.includes(userMessage), false);
+
+      const extra = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: userMessage, note: fakeKey }),
+      });
+      assert.equal(extra.status, 400);
+      assert.deepEqual(extra.body, {
+        error: { code: "INVALID_NOVA_MESSAGE", message: "Message is invalid." },
+      });
+      assert.equal(extra.text.includes(fakeKey), false);
+      assert.equal(extra.text.includes(userMessage), false);
+
+      const blank = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: "   " }),
+      });
+      assert.equal(blank.status, 400);
+      assert.equal(blank.body.error.code, "INVALID_NOVA_MESSAGE");
+
+      const oversized = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: "m".repeat(MAX_NOVA_MESSAGE_LENGTH + 1) }),
+      });
+      assert.equal(oversized.status, 400);
+      assert.equal(oversized.body.error.code, "INVALID_NOVA_MESSAGE");
+
+      const unavailable = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: userMessage }),
+      });
+      assert.equal(unavailable.status, 502);
+      assert.deepEqual(unavailable.body, {
+        error: { code: "NOVA_UNAVAILABLE", message: "Nova is unavailable." },
+      });
+      assert.equal(unavailable.text.includes(fakeKey), false);
+      assert.equal(unavailable.text.includes(userMessage), false);
+      const recorded = JSON.stringify(logs);
+      assert.equal(recorded.includes(fakeKey), false);
+      assert.equal(recorded.includes(userMessage), false);
+      assert.equal(
+        logs.some(
+          (entry) =>
+            entry.kind === "failure" && entry.errorName === "NovaUnavailableError",
+        ),
+        true,
+      );
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("maps a model timeout to the allowlisted timeout response", async () => {
+    const server = createHttpServer({
+      ...createCatalog().ports(),
+      ids: createSequentialIds(),
+      clock: { now: () => new Date("2026-10-07T00:00:00.000Z") },
+      devAccessToken,
+      log: recordingLog([]),
+      languageModel: {
+        async generate() {
+          const error = new NovaTimeoutError();
+          error.message = `timeout ${fakeKey} ${userMessage}`;
+          throw error;
+        },
+      },
+    });
+    const baseUrl = await listen(server);
+
+    try {
+      const response = await send(baseUrl, "/api/nova/chat", {
+        method: "POST",
+        token: devAccessToken,
+        body: JSON.stringify({ message: userMessage }),
+      });
+      assert.equal(response.status, 504);
+      assert.deepEqual(response.body, {
+        error: {
+          code: "NOVA_TIMEOUT",
+          message: "Nova took too long to respond.",
+        },
+      });
+      assert.equal(response.text.includes(fakeKey), false);
+      assert.equal(response.text.includes(userMessage), false);
+    } finally {
+      await closeServer(server);
+    }
+  });
+});
+
+const idleLanguageModel: LanguageModel = {
+  async generate() {
+    throw new Error("Nova was not part of this request.");
+  },
+};
 
 type MutableClock = Clock & { instant: Date };
 

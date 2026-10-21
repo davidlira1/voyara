@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx --test src/domain/**/*.test.ts src/application/**/*.test.ts src/http/*.test.ts",
+    "test": "tsx --test src/domain/**/*.test.ts src/application/**/*.test.ts src/http/*.test.ts src/infrastructure/gemini/*.test.ts",
     "test:http": "bash scripts/test-http.sh",
     "start": "tsx src/http/main.ts",
     "test:persistence": "prisma migrate deploy && tsx --test --test-concurrency=1 src/infrastructure/persistence/prisma/*.test.ts src/infrastructure/seed/*.test.ts",

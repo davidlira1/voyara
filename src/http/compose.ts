@@ -1,5 +1,7 @@
 import type { Clock } from "../application/clock.js";
 import { systemClock } from "../application/clock.js";
+import { NovaUnavailableError } from "../application/errors.js";
+import type { LanguageModel } from "../application/ports/language-model.js";
 import { createBookingIdGenerator } from "../infrastructure/identity/confirmation-code.js";
 import type { PrismaClient } from "../infrastructure/persistence/prisma/client.js";
 import { createPrismaFlightQueryRepository } from "../infrastructure/persistence/prisma/repositories/flight-query-repository.js";
@@ -10,9 +12,16 @@ import { createPrismaVoyageQueryRepository } from "../infrastructure/persistence
 import { createHttpServer, type HttpDependencies, type HttpLog } from "./server.js";
 import type { Server } from "node:http";
 
+const unavailableLanguageModel: LanguageModel = {
+  async generate() {
+    throw new NovaUnavailableError();
+  },
+};
+
 export function composeHttpServer(input: {
   prisma: PrismaClient;
   devAccessToken: string;
+  languageModel?: LanguageModel;
   clock?: Clock;
   log?: HttpLog;
   maxBodyBytes?: number;
@@ -26,6 +35,7 @@ export function composeHttpServer(input: {
     ids: createBookingIdGenerator(),
     clock: input.clock ?? systemClock,
     devAccessToken: input.devAccessToken,
+    languageModel: input.languageModel ?? unavailableLanguageModel,
     ...(input.maxBodyBytes === undefined
       ? {}
       : { maxBodyBytes: input.maxBodyBytes }),

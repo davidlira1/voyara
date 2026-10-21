@@ -3,8 +3,11 @@ import { FlightNotBookableError } from "../application/errors.js";
 import { FlightNotFoundError } from "../application/errors.js";
 import { InsufficientAvailabilityError } from "../application/errors.js";
 import { InvalidBookingError } from "../application/errors.js";
+import { InvalidNovaMessageError } from "../application/errors.js";
 import { InvalidReservationError } from "../application/errors.js";
 import { InvalidSearchCriteriaError } from "../application/errors.js";
+import { NovaTimeoutError } from "../application/errors.js";
+import { NovaUnavailableError } from "../application/errors.js";
 import { ReservationNotFoundError } from "../application/errors.js";
 import { UnsupportedTravelClassError } from "../application/errors.js";
 import { VoyageNotFoundError } from "../application/errors.js";
@@ -28,6 +31,9 @@ const clientMessages = {
   CANCELLATION_NOT_ALLOWED: "Reservation cannot be cancelled.",
   PAYLOAD_TOO_LARGE: "Request body is too large.",
   UNSUPPORTED_MEDIA_TYPE: "Content type is not supported.",
+  INVALID_NOVA_MESSAGE: "Message is invalid.",
+  NOVA_UNAVAILABLE: "Nova is unavailable.",
+  NOVA_TIMEOUT: "Nova took too long to respond.",
   INTERNAL_ERROR: "Unexpected server failure.",
 } as const;
 
@@ -50,6 +56,9 @@ const clientStatuses = {
   CANCELLATION_NOT_ALLOWED: 409,
   PAYLOAD_TOO_LARGE: 413,
   UNSUPPORTED_MEDIA_TYPE: 415,
+  INVALID_NOVA_MESSAGE: 400,
+  NOVA_UNAVAILABLE: 502,
+  NOVA_TIMEOUT: 504,
   INTERNAL_ERROR: 500,
 } as const;
 
@@ -125,6 +134,18 @@ export function toClientError(error: unknown): HttpError {
 
   if (error instanceof CancellationNotAllowedError) {
     return clientError("CANCELLATION_NOT_ALLOWED");
+  }
+
+  if (error instanceof InvalidNovaMessageError) {
+    return clientError("INVALID_NOVA_MESSAGE");
+  }
+
+  if (error instanceof NovaUnavailableError) {
+    return clientError("NOVA_UNAVAILABLE");
+  }
+
+  if (error instanceof NovaTimeoutError) {
+    return clientError("NOVA_TIMEOUT");
   }
 
   return clientError("INTERNAL_ERROR");

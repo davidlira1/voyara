@@ -72,11 +72,12 @@ Catalog reads are public:
 - `GET /api/flights/:flightNumber`
 - `GET /api/flights/:flightNumber/availability`
 
-These routes require the development token because they accept or return customer data, or they create reservations:
+These routes require the development token because they accept or return customer data, create reservations, or talk to Nova:
 
 - `POST /api/reservations`
 - `GET /api/reservations/:confirmationCode`
 - `POST /api/reservations/:confirmationCode/cancel`
+- `POST /api/nova/chat`
 
 Send the token in the `Authorization` header:
 
@@ -86,7 +87,9 @@ Authorization: Bearer <VOYARA_DEV_ACCESS_TOKEN>
 
 A missing or wrong token returns `401` and does not look up the reservation. A confirmation code alone does not authorize retrieval or cancellation. Protected responses send `Cache-Control: no-store`.
 
-Request logs record the method, the route template, and the status. They do not record raw URLs, confirmation codes, tokens, request bodies, customer details, or SQL. Unexpected failures are logged by error name. Clients receive an allowlisted message, never a stack, SQL, Prisma error, or internal id.
+Request logs record the method, the route template, and the status. They do not record raw URLs, confirmation codes, tokens, request bodies, customer details, Nova messages, or SQL. Unexpected failures are logged by error name. Clients receive an allowlisted message, never a stack, SQL, Prisma error, or internal id.
+
+Nova's chat endpoint is documented in [docs/nova.md](nova.md).
 
 ## Sample requests
 
@@ -148,7 +151,7 @@ Errors use one shape. The message comes from a fixed allowlist:
 }
 ```
 
-`400` is invalid input. `401` is a missing or wrong development token. `404` is an unknown voyage, flight, reservation, or route. `409` is a booking or cancellation conflict. `405` is the wrong method for a known route. `413` is a body larger than 16 KiB. `415` is a content type other than `application/json`. `500` is an unexpected failure and always says `Unexpected server failure.`
+`400` is invalid input. `401` is a missing or wrong development token. `404` is an unknown voyage, flight, reservation, or route. `409` is a booking or cancellation conflict. `405` is the wrong method for a known route. `413` is a body larger than 16 KiB. `415` is a content type other than `application/json`. `502` means Nova is unavailable. `504` means Nova timed out. `500` is an unexpected failure and always says `Unexpected server failure.`
 
 ## Tests
 
